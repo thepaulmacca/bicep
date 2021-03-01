@@ -57,12 +57,18 @@ namespace Bicep.Core.TypeSystem
             // it should be possible to use 
             // model.GetSymbolInfo(syntax.Body) is ObectType
             // Currently propertyFlags are not propagated
-            if (model.GetSymbolInfo(syntax) is ResourceSymbol resourceSymbol &&
-                resourceSymbol.Type is ResourceType resourceType &&
-                resourceType.Body is ObjectType bodyObj)
+            var symbol = model.GetSymbolInfo(syntax);
+            switch(symbol)
             {
-                this.bodyObj = bodyObj;
+                case ResourceSymbol { IsCollection: false, Type: ResourceType { Body: ObjectType bodyObj } }:
+                    this.bodyObj = bodyObj;
+                    break;
+
+                case ResourceSymbol { IsCollection: true, Type: ArrayType { Item: ResourceType { Body: ObjectType bodyObj } } }:
+                    this.bodyObj = bodyObj;
+                    break;
             }
+
             base.VisitResourceDeclarationSyntax(syntax);
             this.bodyObj = null;
         }
@@ -73,12 +79,18 @@ namespace Bicep.Core.TypeSystem
             // it should be possible to use 
             // model.GetSymbolInfo(syntax.Body) is ObectType
             // Currently propertyFlags are not propagated
-            if (model.GetSymbolInfo(syntax) is ModuleSymbol moduleSymbol &&
-                moduleSymbol.Type is ModuleType moduleType &&
-                moduleType.Body is ObjectType bodyObj)
+            var symbol = model.GetSymbolInfo(syntax);
+            switch(symbol)
             {
-                this.bodyObj = bodyObj;
+                case ModuleSymbol { IsCollection: false, Type: ModuleType { Body: ObjectType bodyObj } }:
+                    this.bodyObj = bodyObj;
+                    break;
+
+                case ModuleSymbol { IsCollection: true, Type: ArrayType { Item: ModuleType { Body: ObjectType bodyObj } } }:
+                    this.bodyObj = bodyObj;
+                    break;
             }
+
             base.VisitModuleDeclarationSyntax(syntax);
             this.bodyObj = null;
         }
