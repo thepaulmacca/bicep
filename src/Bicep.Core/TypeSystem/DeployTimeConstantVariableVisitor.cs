@@ -54,9 +54,9 @@ namespace Bicep.Core.TypeSystem
         // properties which are assigned entire resource/modules, or to recurse through a chain of variable references.
         public override void VisitVariableAccessSyntax(VariableAccessSyntax syntax)
         {
-            if (DeployTimeConstantVisitor.ExtractResourceOrModuleSymbolAndBodyObj(this.model, syntax) is ({} declaredSymbol, {} referencedBodyObj))
+            if (DeployTimeConstantVisitor.ExtractResourceOrModuleSymbolAndBodyType(this.model, syntax) is ({} declaredSymbol, {} referencedBodyType))
             {
-                this.InvalidReferencedBodyType = referencedBodyObj;
+                this.InvalidReferencedBodyType = referencedBodyType;
                 VisitedStack.Push(declaredSymbol.Name);
             }
             else if (model.GetSymbolInfo(syntax) is VariableSymbol variableSymbol)
@@ -71,14 +71,14 @@ namespace Bicep.Core.TypeSystem
         {
             if (syntax.BaseExpression is VariableAccessSyntax baseSyntax)
             {
-                if (DeployTimeConstantVisitor.ExtractResourceOrModuleSymbolAndBodyObj(this.model, baseSyntax) is ({} declaredSymbol, {} referencedBodyObj))
+                if (DeployTimeConstantVisitor.ExtractResourceOrModuleSymbolAndBodyType(this.model, baseSyntax) is ({} declaredSymbol, {} referencedBodyType))
                 {
                     if (syntax.IndexExpression is StringSyntax stringSyntax &&
                     stringSyntax.TryGetLiteralValue() is string property &&
-                    referencedBodyObj.Properties.TryGetValue(property, out var propertyType) &&
+                    referencedBodyType.Properties.TryGetValue(property, out var propertyType) &&
                     !propertyType.Flags.HasFlag(TypePropertyFlags.DeployTimeConstant))
                     {
-                        this.InvalidReferencedBodyType = referencedBodyObj;
+                        this.InvalidReferencedBodyType = referencedBodyType;
                         VisitedStack.Push(declaredSymbol.Name);
                     }
                     // Do not VisitVariableAccessSyntax on Resources or Modules
@@ -92,18 +92,20 @@ namespace Bicep.Core.TypeSystem
         {
             if (syntax.BaseExpression is VariableAccessSyntax baseSyntax)
             {
-                if (DeployTimeConstantVisitor.ExtractResourceOrModuleSymbolAndBodyObj(this.model, baseSyntax) is ({} declaredSymbol, {} referencedBodyObj))
+                if (DeployTimeConstantVisitor.ExtractResourceOrModuleSymbolAndBodyType(this.model, baseSyntax) is ({} declaredSymbol, {} referencedBodyType))
                 {
-                    if (referencedBodyObj.Properties.TryGetValue(syntax.PropertyName.IdentifierName, out var propertyType) &&
+                    if (referencedBodyType.Properties.TryGetValue(syntax.PropertyName.IdentifierName, out var propertyType) &&
                     !propertyType.Flags.HasFlag(TypePropertyFlags.DeployTimeConstant))
                     {
-                        this.InvalidReferencedBodyType = referencedBodyObj;
+                        this.InvalidReferencedBodyType = referencedBodyType;
                         VisitedStack.Push(declaredSymbol.Name);
                     }
                 }
+
                 // Do not VisitVariableAccessSyntax on Resources or Modules
                 return;
             }
+
             base.VisitPropertyAccessSyntax(syntax);
         }
         #endregion

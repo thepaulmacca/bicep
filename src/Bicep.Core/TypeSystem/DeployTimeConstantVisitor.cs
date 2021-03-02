@@ -180,24 +180,24 @@ namespace Bicep.Core.TypeSystem
                 }
 
                 // validate only on resource and module symbols
-                if (ExtractResourceOrModuleSymbolAndBodyObj(this.model, variableAccessSyntax) is ({ } declaredSymbol, { } referencedBodyObj))
+                if (ExtractResourceOrModuleSymbolAndBodyType(this.model, variableAccessSyntax) is ({ } declaredSymbol, { } referencedBodyType))
                 {
                     switch (syntax.IndexExpression)
                     {
                         case StringSyntax stringSyntax when stringSyntax.TryGetLiteralValue() is string literalValue:
-                            if (referencedBodyObj.Properties.TryGetValue(literalValue, out var propertyType) &&
+                            if (referencedBodyType.Properties.TryGetValue(literalValue, out var propertyType) &&
                             !propertyType.Flags.HasFlag(TypePropertyFlags.DeployTimeConstant))
                             {
                                 this.errorSyntax = syntax;
                                 this.accessedSymbol = declaredSymbol.Name;
-                                this.referencedBodyType = referencedBodyObj;
+                                this.referencedBodyType = referencedBodyType;
                             }
                             break;
                         default:
                             // we will block referencing module and resource properties using string interpolation and number indexing
                             this.errorSyntax = syntax;
                             this.accessedSymbol = declaredSymbol!.Name;
-                            this.referencedBodyType = referencedBodyObj;
+                            this.referencedBodyType = referencedBodyType;
                             break;
                     }
                 }
@@ -220,13 +220,13 @@ namespace Bicep.Core.TypeSystem
                 {
                     this.AppendError();
                 }
-                if (ExtractResourceOrModuleSymbolAndBodyObj(this.model, variableAccessSyntax) is ({ } declaredSymbol, { } referencedBodyObj) &&
-                    referencedBodyObj.Properties.TryGetValue(syntax.PropertyName.IdentifierName, out var propertyType) &&
+                if (ExtractResourceOrModuleSymbolAndBodyType(this.model, variableAccessSyntax) is ({ } declaredSymbol, { } referencedBodyType) &&
+                    referencedBodyType.Properties.TryGetValue(syntax.PropertyName.IdentifierName, out var propertyType) &&
                     !propertyType.Flags.HasFlag(TypePropertyFlags.DeployTimeConstant))
                 {
                     this.errorSyntax = syntax;
                     this.accessedSymbol = declaredSymbol.Name;
-                    this.referencedBodyType = referencedBodyObj;
+                    this.referencedBodyType = referencedBodyType;
                 }
             }
         }
@@ -269,7 +269,7 @@ namespace Bicep.Core.TypeSystem
         }
 
         #region Helpers
-        public static (DeclaredSymbol?, ObjectType?) ExtractResourceOrModuleSymbolAndBodyObj(SemanticModel model, VariableAccessSyntax syntax)
+        public static (DeclaredSymbol?, ObjectType?) ExtractResourceOrModuleSymbolAndBodyType(SemanticModel model, VariableAccessSyntax syntax)
         {
             var baseSymbol = model.GetSymbolInfo(syntax);
             switch (baseSymbol)
