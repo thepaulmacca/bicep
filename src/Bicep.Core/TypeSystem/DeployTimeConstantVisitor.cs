@@ -53,6 +53,12 @@ namespace Bicep.Core.TypeSystem
         // these need to be kept synchronized
         public override void VisitResourceDeclarationSyntax(ResourceDeclarationSyntax syntax)
         {
+            // in certain cases, errors will cause this visitor to short-circuit, 
+            // which causes state to be left over after processing a peer declaration
+            // let's clean it up
+            this.bodyObj = null;
+            ResetState();
+
             // Once https://github.com/Azure/bicep/issues/1177 is fixed,
             // it should be possible to use 
             // model.GetSymbolInfo(syntax.Body) is ObectType
@@ -75,6 +81,12 @@ namespace Bicep.Core.TypeSystem
 
         public override void VisitModuleDeclarationSyntax(ModuleDeclarationSyntax syntax)
         {
+            // in certain cases, errors will cause this visitor to short-circuit, 
+            // which causes state to be left over after processing a peer declaration
+            // let's clean it up
+            this.bodyObj = null;
+            ResetState();
+
             // Once https://github.com/Azure/bicep/issues/1177 is fixed,
             // it should be possible to use 
             // model.GetSymbolInfo(syntax.Body) is ObectType
@@ -247,6 +259,11 @@ namespace Bicep.Core.TypeSystem
             var usableKeys = this.referencedBodyObj.Properties.Where(kv => kv.Value.Flags.HasFlag(TypePropertyFlags.DeployTimeConstant)).Select(kv => kv.Key);
             this.diagnosticWriter.Write(DiagnosticBuilder.ForPosition(this.errorSyntax).RuntimePropertyNotAllowed(this.currentProperty, usableKeys, this.accessedSymbol, this.variableVisitorStack?.ToArray().Reverse()));
 
+            ResetState();
+        }
+
+        private void ResetState()
+        {
             this.errorSyntax = null;
             this.referencedBodyObj = null;
             this.accessedSymbol = null;
