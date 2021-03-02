@@ -236,23 +236,23 @@ namespace Bicep.Core.TypeSystem
         {
             if (this.errorSyntax == null)
             {
-                throw new NullReferenceException($"{nameof(this.errorSyntax)} is null in {this.GetType().Name}");
+                throw new InvalidOperationException($"{nameof(this.errorSyntax)} is null in {this.GetType().Name}");
             }
             if (this.currentProperty == null)
             {
-                throw new NullReferenceException($"{nameof(this.currentProperty)} is null in {this.GetType().Name} for syntax {this.errorSyntax.ToString()}");
+                throw new InvalidOperationException($"{nameof(this.currentProperty)} is null in {this.GetType().Name} for syntax {this.errorSyntax.ToString()}");
             }
             if (this.bodyType == null)
             {
-                throw new NullReferenceException($"{nameof(this.bodyType)} is null in {this.GetType().Name} for syntax {this.errorSyntax.ToString()}");
+                throw new InvalidOperationException($"{nameof(this.bodyType)} is null in {this.GetType().Name} for syntax {this.errorSyntax.ToString()}");
             }
             if (this.referencedBodyType == null)
             {
-                throw new NullReferenceException($"{nameof(this.referencedBodyType)} is null in {this.GetType().Name} for syntax {this.errorSyntax.ToString()}");
+                throw new InvalidOperationException($"{nameof(this.referencedBodyType)} is null in {this.GetType().Name} for syntax {this.errorSyntax.ToString()}");
             }
             if (this.accessedSymbol == null)
             {
-                throw new NullReferenceException($"{nameof(this.accessedSymbol)} is null in {this.GetType().Name} for syntax {this.errorSyntax.ToString()}");
+                throw new InvalidOperationException($"{nameof(this.accessedSymbol)} is null in {this.GetType().Name} for syntax {this.errorSyntax.ToString()}");
             }
             var usableKeys = this.referencedBodyType.Properties.Where(kv => kv.Value.Flags.HasFlag(TypePropertyFlags.DeployTimeConstant)).Select(kv => kv.Key);
             this.diagnosticWriter.Write(DiagnosticBuilder.ForPosition(this.errorSyntax).RuntimePropertyNotAllowed(this.currentProperty, usableKeys, this.accessedSymbol, this.variableVisitorStack?.ToArray().Reverse()));
