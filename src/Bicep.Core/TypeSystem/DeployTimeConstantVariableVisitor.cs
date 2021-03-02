@@ -13,25 +13,27 @@ namespace Bicep.Core.TypeSystem
     public sealed class DeployTimeConstantVariableVisitor : SyntaxVisitor
     {
         private readonly SemanticModel model;
-        public Stack<string> visitedStack;
-        public ObjectType? invalidReferencedBodyObj;
-
+        
         public DeployTimeConstantVariableVisitor(SemanticModel model)
         {
             this.model = model;
-            this.visitedStack = new Stack<string>();
+            this.VisitedStack = new Stack<string>();
         }
+
+        public Stack<string> VisitedStack { get; private set; }
+
+        public ObjectType? InvalidReferencedBodyType { get; private set; }
 
         public override void VisitVariableDeclarationSyntax(VariableDeclarationSyntax syntax)
         {
-            visitedStack.Push(syntax.Name.IdentifierName);
+            VisitedStack.Push(syntax.Name.IdentifierName);
             base.VisitVariableDeclarationSyntax(syntax);
-            if (this.invalidReferencedBodyObj != null)
+            if (this.InvalidReferencedBodyType != null)
             {
                 return;
             }
             // This variable declaration was deployment time constant
-            if (visitedStack.Pop() is var popped &&
+            if (VisitedStack.Pop() is var popped &&
                 popped != syntax.Name.IdentifierName)
             {
                 throw new InvalidOperationException($"{this.GetType().Name} performed an invalid Stack push/pop: expected popped element to be {syntax.Name.IdentifierName} but got {popped}");
@@ -41,7 +43,7 @@ namespace Bicep.Core.TypeSystem
         public override void VisitObjectPropertySyntax(ObjectPropertySyntax syntax)
         {
             // Checked for short circuiting: We only show one violation at a time per variable
-            if (this.invalidReferencedBodyObj != null)
+            if (this.InvalidReferencedBodyType != null)
             {
                 return;
             }
@@ -54,8 +56,8 @@ namespace Bicep.Core.TypeSystem
         {
             if (DeployTimeConstantVisitor.ExtractResourceOrModuleSymbolAndBodyObj(this.model, syntax) is ({} declaredSymbol, {} referencedBodyObj))
             {
-                this.invalidReferencedBodyObj = referencedBodyObj;
-                visitedStack.Push(declaredSymbol.Name);
+                this.InvalidReferencedBodyType = referencedBodyObj;
+                VisitedStack.Push(declaredSymbol.Name);
             }
             else if (model.GetSymbolInfo(syntax) is VariableSymbol variableSymbol)
             {
@@ -76,8 +78,8 @@ namespace Bicep.Core.TypeSystem
                     referencedBodyObj.Properties.TryGetValue(property, out var propertyType) &&
                     !propertyType.Flags.HasFlag(TypePropertyFlags.DeployTimeConstant))
                     {
-                        this.invalidReferencedBodyObj = referencedBodyObj;
-                        visitedStack.Push(declaredSymbol.Name);
+                        this.InvalidReferencedBodyType = referencedBodyObj;
+                        VisitedStack.Push(declaredSymbol.Name);
                     }
                     // Do not VisitVariableAccessSyntax on Resources or Modules
                     return;
@@ -95,8 +97,8 @@ namespace Bicep.Core.TypeSystem
                     if (referencedBodyObj.Properties.TryGetValue(syntax.PropertyName.IdentifierName, out var propertyType) &&
                     !propertyType.Flags.HasFlag(TypePropertyFlags.DeployTimeConstant))
                     {
-                        this.invalidReferencedBodyObj = referencedBodyObj;
-                        visitedStack.Push(declaredSymbol.Name);
+                        this.InvalidReferencedBodyType = referencedBodyObj;
+                        VisitedStack.Push(declaredSymbol.Name);
                     }
                 }
                 // Do not VisitVariableAccessSyntax on Resources or Modules

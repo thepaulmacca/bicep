@@ -15,7 +15,6 @@ namespace Bicep.Core.TypeSystem
     /// </summary>
     public sealed class DeployTimeConstantVisitor : SyntaxVisitor
     {
-
         private readonly SemanticModel model;
         private readonly IDiagnosticWriter diagnosticWriter;
 
@@ -23,11 +22,10 @@ namespace Bicep.Core.TypeSystem
         private SyntaxBase? errorSyntax;
         private string? currentProperty;
         private string? accessedSymbol;
-        private ObjectType? bodyObj;
-        private ObjectType? referencedBodyObj;
+        private ObjectType? bodyType;
+        private ObjectType? referencedBodyType;
 
         private Stack<string>? variableVisitorStack;
-
 
         private DeployTimeConstantVisitor(SemanticModel model, IDiagnosticWriter diagnosticWriter)
         {
@@ -56,7 +54,7 @@ namespace Bicep.Core.TypeSystem
             // in certain cases, errors will cause this visitor to short-circuit, 
             // which causes state to be left over after processing a peer declaration
             // let's clean it up
-            this.bodyObj = null;
+            this.bodyType = null;
             ResetState();
 
             // Once https://github.com/Azure/bicep/issues/1177 is fixed,
@@ -67,16 +65,16 @@ namespace Bicep.Core.TypeSystem
             switch(symbol)
             {
                 case ResourceSymbol { IsCollection: false, Type: ResourceType { Body: ObjectType bodyObj } }:
-                    this.bodyObj = bodyObj;
+                    this.bodyType = bodyObj;
                     break;
 
                 case ResourceSymbol { IsCollection: true, Type: ArrayType { Item: ResourceType { Body: ObjectType bodyObj } } }:
-                    this.bodyObj = bodyObj;
+                    this.bodyType = bodyObj;
                     break;
             }
 
             base.VisitResourceDeclarationSyntax(syntax);
-            this.bodyObj = null;
+            this.bodyType = null;
         }
 
         public override void VisitModuleDeclarationSyntax(ModuleDeclarationSyntax syntax)
@@ -84,7 +82,7 @@ namespace Bicep.Core.TypeSystem
             // in certain cases, errors will cause this visitor to short-circuit, 
             // which causes state to be left over after processing a peer declaration
             // let's clean it up
-            this.bodyObj = null;
+            this.bodyType = null;
             ResetState();
 
             // Once https://github.com/Azure/bicep/issues/1177 is fixed,
@@ -94,30 +92,30 @@ namespace Bicep.Core.TypeSystem
             var symbol = model.GetSymbolInfo(syntax);
             switch(symbol)
             {
-                case ModuleSymbol { IsCollection: false, Type: ModuleType { Body: ObjectType bodyObj } }:
-                    this.bodyObj = bodyObj;
+                case ModuleSymbol { IsCollection: false, Type: ModuleType { Body: ObjectType bodyType } }:
+                    this.bodyType = bodyType;
                     break;
 
-                case ModuleSymbol { IsCollection: true, Type: ArrayType { Item: ModuleType { Body: ObjectType bodyObj } } }:
-                    this.bodyObj = bodyObj;
+                case ModuleSymbol { IsCollection: true, Type: ArrayType { Item: ModuleType { Body: ObjectType bodyType } } }:
+                    this.bodyType = bodyType;
                     break;
             }
 
             base.VisitModuleDeclarationSyntax(syntax);
-            this.bodyObj = null;
+            this.bodyType = null;
         }
         #endregion
 
         public override void VisitObjectSyntax(ObjectSyntax syntax)
         {
-            if (this.bodyObj == null)
+            if (this.bodyType == null)
             {
                 return;
             }
             // Only visit the object properties if they are required to be deploy time constant.
             foreach (var deployTimeIdentifier in ObjectSyntaxExtensions.ToNamedPropertyDictionary(syntax))
             {
-                if (this.bodyObj.Properties.TryGetValue(deployTimeIdentifier.Key, out var propertyType) &&
+                if (this.bodyType.Properties.TryGetValue(deployTimeIdentifier.Key, out var propertyType) &&
                     propertyType.Flags.HasFlag(TypePropertyFlags.DeployTimeConstant))
                 {
                     this.currentProperty = deployTimeIdentifier.Key;
@@ -151,12 +149,12 @@ namespace Bicep.Core.TypeSystem
                     }
                     var variableVisitor = new DeployTimeConstantVariableVisitor(this.model);
                     variableVisitor.Visit(variableSymbol.DeclaringSyntax);
-                    if (variableVisitor.invalidReferencedBodyObj != null)
+                    if (variableVisitor.InvalidReferencedBodyType != null)
                     {
                         this.errorSyntax = syntax;
-                        this.referencedBodyObj = variableVisitor.invalidReferencedBodyObj;
-                        this.variableVisitorStack = variableVisitor.visitedStack;
-                        this.accessedSymbol = variableVisitor.visitedStack.Peek();
+                        this.referencedBodyType = variableVisitor.InvalidReferencedBodyType;
+                        this.variableVisitorStack = variableVisitor.VisitedStack;
+                        this.accessedSymbol = variableVisitor.VisitedStack.Peek();
                     }
                     break;
             }
@@ -192,14 +190,14 @@ namespace Bicep.Core.TypeSystem
                             {
                                 this.errorSyntax = syntax;
                                 this.accessedSymbol = declaredSymbol.Name;
-                                this.referencedBodyObj = referencedBodyObj;
+                                this.referencedBodyType = referencedBodyObj;
                             }
                             break;
                         default:
                             // we will block referencing module and resource properties using string interpolation and number indexing
                             this.errorSyntax = syntax;
                             this.accessedSymbol = declaredSymbol!.Name;
-                            this.referencedBodyObj = referencedBodyObj;
+                            this.referencedBodyType = referencedBodyObj;
                             break;
                     }
                 }
@@ -228,7 +226,7 @@ namespace Bicep.Core.TypeSystem
                 {
                     this.errorSyntax = syntax;
                     this.accessedSymbol = declaredSymbol.Name;
-                    this.referencedBodyObj = referencedBodyObj;
+                    this.referencedBodyType = referencedBodyObj;
                 }
             }
         }
@@ -244,19 +242,19 @@ namespace Bicep.Core.TypeSystem
             {
                 throw new NullReferenceException($"{nameof(this.currentProperty)} is null in {this.GetType().Name} for syntax {this.errorSyntax.ToString()}");
             }
-            if (this.bodyObj == null)
+            if (this.bodyType == null)
             {
-                throw new NullReferenceException($"{nameof(this.bodyObj)} is null in {this.GetType().Name} for syntax {this.errorSyntax.ToString()}");
+                throw new NullReferenceException($"{nameof(this.bodyType)} is null in {this.GetType().Name} for syntax {this.errorSyntax.ToString()}");
             }
-            if (this.referencedBodyObj == null)
+            if (this.referencedBodyType == null)
             {
-                throw new NullReferenceException($"{nameof(this.referencedBodyObj)} is null in {this.GetType().Name} for syntax {this.errorSyntax.ToString()}");
+                throw new NullReferenceException($"{nameof(this.referencedBodyType)} is null in {this.GetType().Name} for syntax {this.errorSyntax.ToString()}");
             }
             if (this.accessedSymbol == null)
             {
                 throw new NullReferenceException($"{nameof(this.accessedSymbol)} is null in {this.GetType().Name} for syntax {this.errorSyntax.ToString()}");
             }
-            var usableKeys = this.referencedBodyObj.Properties.Where(kv => kv.Value.Flags.HasFlag(TypePropertyFlags.DeployTimeConstant)).Select(kv => kv.Key);
+            var usableKeys = this.referencedBodyType.Properties.Where(kv => kv.Value.Flags.HasFlag(TypePropertyFlags.DeployTimeConstant)).Select(kv => kv.Key);
             this.diagnosticWriter.Write(DiagnosticBuilder.ForPosition(this.errorSyntax).RuntimePropertyNotAllowed(this.currentProperty, usableKeys, this.accessedSymbol, this.variableVisitorStack?.ToArray().Reverse()));
 
             ResetState();
@@ -265,7 +263,7 @@ namespace Bicep.Core.TypeSystem
         private void ResetState()
         {
             this.errorSyntax = null;
-            this.referencedBodyObj = null;
+            this.referencedBodyType = null;
             this.accessedSymbol = null;
             this.variableVisitorStack = null;
         }
